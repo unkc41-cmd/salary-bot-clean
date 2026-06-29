@@ -7,15 +7,26 @@ app.use(express.json());
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const SHEET_URL = "https://docs.google.com/spreadsheets/d/1kvGQtRTFeXl18Aoaz5Ig52SORYhMiEydDGoIVQWXmPI/gviz/tq?tqx=out:csv&sheet=Лист1";
+// 📊 Google Sheets CSV (Лист1)
+const SHEET_URL =
+  "https://docs.google.com/spreadsheets/d/1kvGQtRTFeXl18Aoaz5Ig52SORYhMiEydDGoIVQWXmPI/gviz/tq?tqx=out:csv&sheet=Лист1";
 
-// ---------------- ЧИТАЄМО ТАБЛИЦЮ ----------------
-async function getData() {
+// ---------------- ЧИТАННЯ ТАБЛИЦІ ----------------
+async function getRows() {
   const res = await axios.get(SHEET_URL);
 
-  return res.data
-    .split("\n")
-    .map(row => row.replace(/\r/g, "").split(","));
+  const lines = res.data.split("\n");
+
+  return lines.map(line => {
+    return line
+      .replace(/\r/g, "")
+      .split(",")
+      .map(cell =>
+        cell
+          .replace(/"/g, "")
+          .trim()
+      );
+  });
 }
 
 // ---------------- START ----------------
@@ -32,37 +43,41 @@ bot.start((ctx) => {
 
 // ---------------- CALLBACK ----------------
 bot.on("callback_query", async (ctx) => {
-  await ctx.answerCbQuery();
+  try {
+    await ctx.answerCbQuery();
 
-  const action = ctx.callbackQuery.data;
-  const id = String(ctx.from.id);
+    const action = ctx.callbackQuery.data;
+    const userId = String(ctx.from.id).trim();
 
-  if (action === "id") {
-    return ctx.reply("🆔 " + id);
-  }
+    // 🆔 ID
+    if (action === "id") {
+      return ctx.reply("🆔 " + userId);
+    }
 
-  if (action === "salary") {
-    try {
-      const data = await getData();
+    // 💰 ЗП
+    if (action === "salary") {
+      const rows = await getRows();
 
-      // пропускаємо заголовок
-      for (let i = 1; i < data.length; i++) {
-        const row = data[i];
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
 
-        const telegramId = (row[0] || "").trim();
-        const salary = row[2] || "0";
+        const sheetId = String(row[0] || "")
+          .replace(/"/g, "")
+          .replace(/\s/g, "")
+          .trim();
 
-        if (telegramId === id) {
-          return ctx.reply("💰 ЗП: " + salary + " грн");
+        const salary = (row[2] || "0").trim();
+
+        if (sheetId === userId) {
+          return ctx.reply(`💰 ЗП: ${salary} грн`);
         }
       }
 
       return ctx.reply("❌ Тебе не знайдено в таблиці");
-
-    } catch (e) {
-      console.log(e);
-      return ctx.reply("⚠️ Помилка читання таблиці");
     }
+  } catch (err) {
+    console.log("ERROR:", err);
+    return ctx.reply("⚠️ Помилка сервера");
   }
 });
 
@@ -77,4 +92,4 @@ app.get("/", (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("RUNNING"));
+app.listen(PORT, () => console.log("RUNNING ON", PORT));
