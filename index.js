@@ -62,13 +62,15 @@ bot.on("callback_query", async (ctx) => {
 
 // ---------------- WEBHOOK ----------------
 app.post("/webhook", (req, res) => {
-  bot.handleUpdate(req.body);
+  console.log("🔥 WEBHOOK HIT:", JSON.stringify(req.body, null, 2));
+
+  try {
+    bot.handleUpdate(req.body);
+  } catch (e) {
+    console.log("❌ HANDLE ERROR:", e);
+  }
+
   res.send("ok");
 });
 
-app.get("/", (req, res) => {
-  res.send("Bot is running");
-});
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("RUNNING ON", PORT));
