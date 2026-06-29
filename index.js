@@ -1,23 +1,21 @@
 const express = require("express");
 const { Telegraf } = require("telegraf");
-const { google } = require("googleapis");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 
-const BOT_TOKEN = process.env.BOT_TOKEN;
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
 const SHEET_ID = process.env.SHEET_ID;
+const API_KEY = process.env.GOOGLE_API_KEY;
 
-const bot = new Telegraf(BOT_TOKEN);
+// ---------------- GOOGLE SHEETS ----------------
+async function getRows() {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Лист1!A:C?key=${API_KEY}`;
 
-// 🔑 ПРОСТА АВТОРИЗАЦІЯ (без credentials.json)
-const auth = new google.auth.GoogleAuth({
-  scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"]
-});
-
-async function getSheets() {
-  const client = await auth.getClient();
-  return google.sheets({ version: "v4", auth: client });
+  const res = await axios.get(url);
+  return res.data.values || [];
 }
 
 // ---------------- START ----------------
@@ -32,7 +30,7 @@ bot.start((ctx) => {
   });
 });
 
-// ---------------- CALLBACK (СТАБІЛЬНИЙ) ----------------
+// ---------------- CALLBACK ----------------
 bot.on("callback_query", async (ctx) => {
   try {
     await ctx.answerCbQuery();
@@ -44,29 +42,24 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("🆔 " + chatId);
     }
 
-  if (action === "salary") {
-  try {
-    const sheets = await sheetsClient();
+    if (action === "salary") {
+      const rows = await getRows();
 
-    const res = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_ID,
-      range: "Лист1!A:C"
-    });
-
-    const rows = res.data.values || [];
-
-    for (let i = 1; i < rows.length; i++) {
-      if (String(rows[i][0]) === String(chatId)) {
-        return ctx.reply("💰 ЗП: " + (rows[i][2] || 0) + " грн");
+      for (let i = 1; i < rows.length; i++) {
+        if (String(rows[i][0]) === chatId) {
+          return ctx.reply("💰 ЗП: " + (rows[i][2] || 0) + " грн");
+        }
       }
+
+      return ctx.reply("❌ Тебе не знайдено в таблиці");
     }
 
-    return ctx.reply("❌ ID не знайдено");
-  } catch (e) {
-    console.log("SHEETS ERROR:", e);
-    return ctx.reply("⚠️ Sheets error (дивись logs)");
+  } catch (err) {
+    console.log("ERROR:", err);
+    return ctx.reply("⚠️ Помилка сервера");
   }
-}
+});
+
 // ---------------- WEBHOOK ----------------
 app.post("/webhook", (req, res) => {
   bot.handleUpdate(req.body);
