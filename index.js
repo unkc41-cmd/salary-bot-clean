@@ -61,16 +61,10 @@ bot.on("callback_query", async (ctx) => {
 });
 
 // ---------------- WEBHOOK ----------------
-app.post("/webhook", (req, res) => {
-  console.log("🔥 WEBHOOK HIT:", JSON.stringify(req.body, null, 2));
-
-  try {
-    bot.handleUpdate(req.body);
-  } catch (e) {
-    console.log("❌ HANDLE ERROR:", e);
-  }
-
+aapp.post("/webhook", (req, res) => {
+  bot.handleUpdate(req.body);
   res.send("ok");
 });
+
 
 
