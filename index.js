@@ -44,31 +44,29 @@ bot.on("callback_query", async (ctx) => {
       return ctx.reply("🆔 " + chatId);
     }
 
-    if (action === "salary") {
-      const sheets = await getSheets();
+  if (action === "salary") {
+  try {
+    const sheets = await sheetsClient();
 
-      const res = await sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID,
-        range: "Лист1!A:C"
-      });
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: SHEET_ID,
+      range: "Лист1!A:C"
+    });
 
-      const rows = res.data.values || [];
+    const rows = res.data.values || [];
 
-      for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][0]) === chatId) {
-          return ctx.reply("💰 ЗП: " + (rows[i][2] || 0) + " грн");
-        }
+    for (let i = 1; i < rows.length; i++) {
+      if (String(rows[i][0]) === String(chatId)) {
+        return ctx.reply("💰 ЗП: " + (rows[i][2] || 0) + " грн");
       }
-
-      return ctx.reply("❌ Тебе не знайдено в таблиці");
     }
 
-  } catch (err) {
-    console.log("ERROR:", err);
-    return ctx.reply("⚠️ Помилка сервера");
+    return ctx.reply("❌ ID не знайдено");
+  } catch (e) {
+    console.log("SHEETS ERROR:", e);
+    return ctx.reply("⚠️ Sheets error (дивись logs)");
   }
-});
-
+}
 // ---------------- WEBHOOK ----------------
 app.post("/webhook", (req, res) => {
   bot.handleUpdate(req.body);
