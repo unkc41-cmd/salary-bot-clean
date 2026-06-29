@@ -1,16 +1,22 @@
 const express = require("express");
 const { Telegraf } = require("telegraf");
+const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-// 📦 БАЗА ДАНИХ (замість Google Sheets)
-const users = {
-  "123456789": { name: "Іван", salary: 15000 },
-  "987654321": { name: "Оля", salary: 18000 }
-};
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/1kvGQtRTFeXl18Aoaz5Ig52SORYhMiEydDGoIVQWXmPI/gviz/tq?tqx=out:csv&sheet=Лист1";
+
+// ---------------- ЧИТАЄМО ТАБЛИЦЮ ----------------
+async function getData() {
+  const res = await axios.get(SHEET_URL);
+
+  return res.data
+    .split("\n")
+    .map(row => row.replace(/\r/g, "").split(","));
+}
 
 // ---------------- START ----------------
 bot.start((ctx) => {
@@ -32,19 +38,31 @@ bot.on("callback_query", async (ctx) => {
   const id = String(ctx.from.id);
 
   if (action === "id") {
-    return ctx.reply("🆔 Твій ID: " + id);
+    return ctx.reply("🆔 " + id);
   }
 
   if (action === "salary") {
-    const user = users[id];
+    try {
+      const data = await getData();
 
-    if (!user) {
-      return ctx.reply("❌ Тебе немає в базі");
+      // пропускаємо заголовок
+      for (let i = 1; i < data.length; i++) {
+        const row = data[i];
+
+        const telegramId = (row[0] || "").trim();
+        const salary = row[2] || "0";
+
+        if (telegramId === id) {
+          return ctx.reply("💰 ЗП: " + salary + " грн");
+        }
+      }
+
+      return ctx.reply("❌ Тебе не знайдено в таблиці");
+
+    } catch (e) {
+      console.log(e);
+      return ctx.reply("⚠️ Помилка читання таблиці");
     }
-
-    return ctx.reply(
-      `💰 ЗП: ${user.salary} грн\n👤 ${user.name}`
-    );
   }
 });
 
