@@ -1,22 +1,16 @@
 const express = require("express");
 const { Telegraf } = require("telegraf");
-const axios = require("axios");
 
 const app = express();
 app.use(express.json());
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
-const SHEET_ID = process.env.SHEET_ID;
-const API_KEY = process.env.GOOGLE_API_KEY;
-
-// ---------------- GOOGLE SHEETS ----------------
-async function getRows() {
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Лист1!A:C?key=${API_KEY}`;
-
-  const res = await axios.get(url);
-  return res.data.values || [];
-}
+// 📦 БАЗА ДАНИХ (замість Google Sheets)
+const users = {
+  "123456789": { name: "Іван", salary: 15000 },
+  "987654321": { name: "Оля", salary: 18000 }
+};
 
 // ---------------- START ----------------
 bot.start((ctx) => {
@@ -32,39 +26,37 @@ bot.start((ctx) => {
 
 // ---------------- CALLBACK ----------------
 bot.on("callback_query", async (ctx) => {
-  try {
-    await ctx.answerCbQuery();
+  await ctx.answerCbQuery();
 
-    const action = ctx.callbackQuery.data;
-    const chatId = String(ctx.from.id);
+  const action = ctx.callbackQuery.data;
+  const id = String(ctx.from.id);
 
-    if (action === "id") {
-      return ctx.reply("🆔 " + chatId);
+  if (action === "id") {
+    return ctx.reply("🆔 Твій ID: " + id);
+  }
+
+  if (action === "salary") {
+    const user = users[id];
+
+    if (!user) {
+      return ctx.reply("❌ Тебе немає в базі");
     }
 
-    if (action === "salary") {
-      const rows = await getRows();
-
-      for (let i = 1; i < rows.length; i++) {
-        if (String(rows[i][0]) === chatId) {
-          return ctx.reply("💰 ЗП: " + (rows[i][2] || 0) + " грн");
-        }
-      }
-
-      return ctx.reply("❌ Тебе не знайдено в таблиці");
-    }
-
-  } catch (err) {
-    console.log("ERROR:", err);
-    return ctx.reply("⚠️ Помилка сервера");
+    return ctx.reply(
+      `💰 ЗП: ${user.salary} грн\n👤 ${user.name}`
+    );
   }
 });
 
 // ---------------- WEBHOOK ----------------
-aapp.post("/webhook", (req, res) => {
+app.post("/webhook", (req, res) => {
   bot.handleUpdate(req.body);
   res.send("ok");
 });
 
+app.get("/", (req, res) => {
+  res.send("Bot is running");
+});
 
-
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("RUNNING"));
